@@ -1,0 +1,8 @@
+{
+  "name": "FORTNITE STORE",
+  "description": "Your ultimate Fortnite gaming marketplace for official V-Bucks packages, legendary cosmetics, pickaxes, gliders, emotes, and verified gaming accounts with instant order tracking and secure USDT payments.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
