@@ -18,6 +18,9 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { GiftsSection } from './components/GiftsSection';
 import { ItemShopView } from './components/ItemShopView';
 import { Footer } from './components/Footer';
+import { FortniteAccountsStore } from './components/FortniteAccountsStore';
+import { FortniteCosmeticsCatalog } from './components/FortniteCosmeticsCatalog';
+import { CryptoPaymentModal } from './components/CryptoPaymentModal';
 import { 
   ShieldCheck, 
   Search, 
@@ -37,7 +40,7 @@ import {
 export default function App() {
   const [currentView, setCurrentView] = useState<
     'home' | 'item-shop' | 'catalog' | 'vbucks' | 'gifts' | 'accounts' | 'track' | 'support' | 'payment' | 'admin'
-  >('home');
+  >('accounts');
 
   // Products and Accounts state
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -77,6 +80,11 @@ export default function App() {
   // Active Order (for Payment and Tracking)
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [trackingOrderId, setTrackingOrderId] = useState<string | undefined>(undefined);
+  const [quickCryptoCheckout, setQuickCryptoCheckout] = useState<{
+    itemTitle: string;
+    amount: number;
+    orderItem: CartItem;
+  } | null>(null);
 
   // Save cart to localStorage
   useEffect(() => {
@@ -154,15 +162,45 @@ export default function App() {
   };
 
   const handleBuyNow = (product: Product, quantity = 1) => {
-    handleAddToCart(product, quantity);
     setIsCartOpen(false);
-    setIsCheckoutOpen(true);
+    setSelectedProduct(null);
+    setQuickCryptoCheckout({
+      itemTitle: quantity > 1 ? `${quantity}x ${product.name}` : product.name,
+      amount: Number((product.price * quantity).toFixed(2)),
+      orderItem: {
+        product,
+        quantity,
+        isGift: false,
+        isAccount: false
+      }
+    });
   };
 
   const handleBuyNowAccount = (account: AccountListing) => {
-    handleAddAccountToCart(account);
     setIsCartOpen(false);
-    setIsCheckoutOpen(true);
+    setSelectedAccount(null);
+    setQuickCryptoCheckout({
+      itemTitle: `${account.id} · ${account.title}`,
+      amount: Number(account.price.toFixed(2)),
+      orderItem: {
+        product: {
+          id: account.id,
+          name: account.title,
+          category: 'bundles',
+          cosmeticType: 'Bundle',
+          rarity: 'Legendary',
+          price: account.price,
+          description: account.description,
+          image: account.screenshots[0] || '/src/assets/images/gaming_account_showcase_1793465508903.jpg',
+          inStock: true,
+          isSampleVerified: true,
+          deliveryMethod: 'Full email access transfer'
+        },
+        quantity: 1,
+        isAccount: true,
+        account
+      }
+    });
   };
 
   const handleUpdateCartQuantity = (productId: string, delta: number) => {
@@ -331,6 +369,15 @@ export default function App() {
         {/* VIEW 1: HOMEPAGE */}
         {currentView === 'home' && (
           <div>
+            {/* Featured 100+ Fortnite Accounts & In-Game Locker Marketplace */}
+            <FortniteAccountsStore
+              onBuyAccount={handleBuyNowAccount}
+              backendAccounts={accounts}
+              onSelectBackendAccount={(a) => setSelectedAccount(a)}
+              onAddProductToCart={handleAddToCart}
+              onBuyProductNow={handleBuyNow}
+            />
+
             {/* Hero Banner */}
             <Hero
               onShopNow={() => {
@@ -512,8 +559,56 @@ export default function App() {
           </div>
         )}
 
-        {/* VIEW 5: COSMETICS CATALOG (100+ Items across all categories) */}
+        {/* VIEW 5: COSMETICS CATALOG (1,420+ Live Cosmetics + Store Bundles/Wraps) */}
         {currentView === 'catalog' && (
+          selectedCategory !== 'wraps' && selectedCategory !== 'bundles' && selectedCategory !== 'gifts' ? (
+            <div>
+              <div className="bg-[#0b1120] border-b border-slate-800 px-4 py-2.5">
+                <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-slate-300">
+                    Browsing <strong className="text-sky-400">Live Fortnite Cosmetics Database</strong>
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setSelectedCategory('wraps');
+                        setCatalogPage(1);
+                      }}
+                      className="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 cursor-pointer"
+                    >
+                      Wraps &amp; Accessories
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedCategory('bundles');
+                        setCatalogPage(1);
+                      }}
+                      className="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 cursor-pointer"
+                    >
+                      Bundles &amp; Packs
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <FortniteCosmeticsCatalog
+                initialCategory={
+                  selectedCategory === 'skins'
+                    ? 'outfit'
+                    : selectedCategory === 'pickaxes'
+                    ? 'pickaxe'
+                    : selectedCategory === 'gliders'
+                    ? 'glider'
+                    : selectedCategory === 'emotes'
+                    ? 'emote'
+                    : selectedCategory === 'backblings'
+                    ? 'backpack'
+                    : 'ALL'
+                }
+                onAddToCart={handleAddToCart}
+                onBuyNow={handleBuyNow}
+              />
+            </div>
+          ) : (
           <div className="max-w-7xl mx-auto px-4 py-10 sm:px-6 lg:px-8 space-y-8 animate-fadeIn">
             {/* Catalog Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-[#1A2234]">
@@ -664,39 +759,18 @@ export default function App() {
               </div>
             )}
           </div>
+          )
         )}
 
-        {/* VIEW 6: GAMING ACCOUNTS */}
+        {/* VIEW 6: GAMING ACCOUNTS (108+ Live Fortnite-API Accounts & Interactive Locker) */}
         {currentView === 'accounts' && (
-          <div className="max-w-7xl mx-auto px-4 py-10 sm:px-6 lg:px-8 space-y-8 animate-fadeIn">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-[#1A2234]">
-              <div>
-                <div className="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-1">
-                  Full Email Access & Verified Stats
-                </div>
-                <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-white">
-                  Gaming Account Listings
-                </h1>
-                <p className="text-sm text-slate-400 mt-1 max-w-2xl">
-                  Each account includes genuine screenshot verification, permanent email ownership transfer, and verified platform compatibility.
-                </p>
-              </div>
-              <div className="text-xs text-slate-400">
-                Active Listings: <strong className="text-cyan-400">{accounts.length}</strong>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {accounts.map(acc => (
-                <AccountCard
-                  key={acc.id}
-                  account={acc}
-                  onSelect={(a) => setSelectedAccount(a)}
-                  onBuyNow={handleBuyNowAccount}
-                />
-              ))}
-            </div>
-          </div>
+          <FortniteAccountsStore
+            onBuyAccount={handleBuyNowAccount}
+            backendAccounts={accounts}
+            onSelectBackendAccount={(a) => setSelectedAccount(a)}
+            onAddProductToCart={handleAddToCart}
+            onBuyProductNow={handleBuyNow}
+          />
         )}
 
         {/* VIEW 7: ORDER TRACKING */}
@@ -786,6 +860,24 @@ export default function App() {
       <PoliciesModal
         policyType={activePolicy}
         onClose={() => setActivePolicy(null)}
+      />
+
+      {/* Instant Crypto Payment Modal (BEP20 & TRC20 QR Checkout for all Buy Now buttons) */}
+      <CryptoPaymentModal
+        isOpen={Boolean(quickCryptoCheckout)}
+        onClose={() => setQuickCryptoCheckout(null)}
+        itemTitle={quickCryptoCheckout?.itemTitle}
+        amount={quickCryptoCheckout?.amount ?? 0}
+        bep20Address={settings?.bep20Address || settings?.wallets?.USDT_BEP20}
+        trc20Address={settings?.trc20Address || settings?.wallets?.USDT_TRC20}
+        bep20QrImage={settings?.bep20QrImage}
+        trc20QrImage={settings?.trc20QrImage}
+        orderItem={quickCryptoCheckout?.orderItem}
+        onOrderSubmitted={(order) => setActiveOrder(order)}
+        onTrackOrder={(orderId) => {
+          setTrackingOrderId(orderId);
+          setCurrentView('track');
+        }}
       />
 
       {/* Global Footer */}

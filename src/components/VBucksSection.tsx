@@ -9,6 +9,100 @@ interface VBucksSectionProps {
   onSelectProduct: (product: Product) => void;
 }
 
+function EpicVBucksBanner({ amount }: { amount: number | string }) {
+  // Coin stack height automatically adjusts based on V-Bucks amount
+  const num = parseInt(String(amount).replace(/[^0-9]/g, ''), 10) || 1000;
+  const stacks = num <= 1000 ? 2 : num <= 2800 ? 3 : num <= 5000 ? 4 : 5;
+
+  return (
+    <div className="relative w-full h-44 bg-gradient-to-br from-[#22c55e] via-[#16a34a] to-[#052e16] flex flex-col items-center justify-between p-3 overflow-hidden select-none">
+      {/* Epic Store Starburst Rays */}
+      <div
+        className="absolute inset-0 opacity-20 pointer-events-none"
+        style={{
+          backgroundImage:
+            'repeating-conic-gradient(from 0deg, rgba(255,255,255,0.4) 0deg 12deg, transparent 12deg 24deg)'
+        }}
+      />
+
+      {/* Bold White FORTNITE Header */}
+      <span
+        className="relative z-10 text-2xl font-black tracking-wider text-white drop-shadow-[0_3px_0_rgba(0,0,0,0.5)]"
+        style={{ fontFamily: 'Impact, sans-serif' }}
+      >
+        FORTNITE
+      </span>
+
+      {/* Silver-Blue V-Bucks Coin Stack SVG */}
+      <svg viewBox="0 0 220 130" className="relative z-10 w-40 h-24 drop-shadow-[0_8px_12px_rgba(0,0,0,0.5)]">
+        <defs>
+          <linearGradient id="vbFace" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#f1f5f9" />
+            <stop offset="55%" stopColor="#94a3b8" />
+            <stop offset="100%" stopColor="#475569" />
+          </linearGradient>
+          <linearGradient id="vbRim" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#7dd3fc" />
+            <stop offset="100%" stopColor="#0284c7" />
+          </linearGradient>
+          <linearGradient id="vbBlue" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#38bdf8" />
+            <stop offset="100%" stopColor="#1e3a8a" />
+          </linearGradient>
+        </defs>
+
+        {/* Left Stack */}
+        <g transform="translate(45, 28)">
+          {[...Array(stacks + 2)].map((_, idx) => (
+            <g key={idx} transform={`translate(0, ${44 - idx * 8})`}>
+              <ellipse cx="26" cy="11" rx="24" ry="9" fill="#1e293b" />
+              <ellipse cx="26" cy="8" rx="24" ry="9" fill="url(#vbFace)" stroke="#cbd5e1" strokeWidth="1" />
+              <ellipse cx="26" cy="8" rx="16" ry="5.5" fill="url(#vbBlue)" />
+            </g>
+          ))}
+        </g>
+
+        {/* Right Stack */}
+        <g transform="translate(120, 20)">
+          {[...Array(stacks + 3)].map((_, idx) => (
+            <g key={idx} transform={`translate(0, ${52 - idx * 8})`}>
+              <ellipse cx="26" cy="11" rx="24" ry="9" fill="#1e293b" />
+              <ellipse cx="26" cy="8" rx="24" ry="9" fill="url(#vbFace)" stroke="#cbd5e1" strokeWidth="1" />
+              <ellipse cx="26" cy="8" rx="16" ry="5.5" fill="url(#vbBlue)" />
+            </g>
+          ))}
+        </g>
+
+        {/* Center Extra Stack for Higher Packs */}
+        {stacks >= 3 && (
+          <g transform="translate(82, 14)">
+            {[...Array(stacks + 3)].map((_, idx) => (
+              <g key={idx} transform={`translate(0, ${54 - idx * 8})`}>
+                <ellipse cx="26" cy="11" rx="24" ry="9" fill="#1e293b" />
+                <ellipse cx="26" cy="8" rx="24" ry="9" fill="url(#vbFace)" stroke="#cbd5e1" strokeWidth="1" />
+                <ellipse cx="26" cy="8" rx="16" ry="5.5" fill="url(#vbBlue)" />
+              </g>
+            ))}
+          </g>
+        )}
+
+        {/* Front Tilted V-Buck Coin */}
+        <g transform="translate(106, 82) rotate(-14)">
+          <circle cx="2" cy="4" r="28" fill="#0f172a" />
+          <circle cx="0" cy="0" r="28" fill="url(#vbFace)" stroke="url(#vbRim)" strokeWidth="3.5" />
+          <circle cx="0" cy="0" r="19" fill="url(#vbBlue)" stroke="#bae6fd" strokeWidth="1.5" />
+          <path d="M-9 -8 L-3 -8 L0 4 L3 -8 L9 -8 L3 10 L-3 10 Z" fill="#ffffff" />
+        </g>
+      </svg>
+
+      {/* Bottom V-Bucks Amount Text */}
+      <span className="relative z-10 text-xs font-black tracking-wider text-white uppercase drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+        {num.toLocaleString()} V-BUCKS
+      </span>
+    </div>
+  );
+}
+
 export const VBucksSection: React.FC<VBucksSectionProps> = ({
   packages,
   onAddToCart,
@@ -82,20 +176,11 @@ export const VBucksSection: React.FC<VBucksSectionProps> = ({
 
                 <div>
                   {/* Image & Coin Graphic */}
-                  <div 
+                  <div
                     onClick={() => onSelectProduct(pkg)}
-                    className="relative w-full h-44 rounded-xl overflow-hidden bg-[#070A12] cursor-pointer mb-5 border border-[#172033]"
+                    className="relative w-full h-44 rounded-xl overflow-hidden cursor-pointer mb-5 border border-[#172033]"
                   >
-                    <img
-                      src={pkg.image}
-                      alt={pkg.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      referrerPolicy="no-referrer"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0D1222] via-transparent to-transparent opacity-70" />
-                    <div className="absolute top-3 right-3 bg-[#070A12]/80 backdrop-blur-sm px-2.5 py-1 rounded text-xs font-bold text-yellow-400 border border-yellow-500/30">
-                      {pkg.rarity}
-                    </div>
+                    <EpicVBucksBanner amount={pkg.vbucksEquivalent ?? pkg.name} />
                   </div>
 
                   {/* Title & Description */}

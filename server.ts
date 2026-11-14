@@ -22,6 +22,60 @@ if (fs.existsSync(publicDir)) {
   app.use(express.static(publicDir));
 }
 
+// Local verified cosmetics catalog index for server-authoritative pricing
+interface RawCatalogCosmetic {
+  id: string;
+  name: string;
+  type: string;
+  rarity: string;
+  icon: string;
+}
+
+const cosmeticsCatalogMap = new Map<string, RawCatalogCosmetic>();
+try {
+  const cosmeticsJsonPath = path.resolve(__dirname, 'src/data/fortniteCosmetics.json');
+  if (fs.existsSync(cosmeticsJsonPath)) {
+    const parsed: RawCatalogCosmetic[] = JSON.parse(fs.readFileSync(cosmeticsJsonPath, 'utf8'));
+    for (const c of parsed) {
+      if (c.id) cosmeticsCatalogMap.set(c.id, c);
+    }
+  }
+} catch (err) {
+  console.warn('Unable to preload fortniteCosmetics.json on server:', err);
+}
+
+function getCosmeticUsdPriceServer(type: string, rarity: string): number {
+  const r = (rarity || 'common').toLowerCase();
+  const t = (type || 'outfit').toLowerCase();
+  if (t === 'outfit') {
+    if (r === 'legendary') return 14.99;
+    if (['marvel', 'dc', 'icon', 'starwars', 'gaminglegends'].includes(r)) return 12.99;
+    if (r === 'epic') return 11.99;
+    if (r === 'rare') return 9.99;
+    if (r === 'uncommon') return 6.99;
+    return 8.99;
+  }
+  if (t === 'pickaxe' || t === 'glider') {
+    if (r === 'legendary') return 11.99;
+    if (['epic', 'marvel', 'dc', 'icon', 'starwars', 'gaminglegends'].includes(r)) return 9.99;
+    if (r === 'rare') return 6.99;
+    if (r === 'uncommon') return 4.99;
+    return 5.99;
+  }
+  if (t === 'emote') {
+    if (r === 'epic') return 6.99;
+    if (['icon', 'marvel', 'dc', 'legendary', 'starwars', 'gaminglegends'].includes(r)) return 5.99;
+    if (r === 'rare') return 4.99;
+    if (r === 'uncommon') return 2.99;
+    return 3.99;
+  }
+  if (r === 'legendary') return 6.99;
+  if (['epic', 'marvel', 'dc', 'icon', 'starwars', 'gaminglegends'].includes(r)) return 5.99;
+  if (r === 'rare') return 4.99;
+  if (r === 'uncommon') return 2.99;
+  return 3.99;
+}
+
 // Admin token middleware
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
@@ -163,7 +217,42 @@ app.post('/api/orders', (req: Request, res: Response) => {
     let calculatedTotal = 0;
 
     for (const item of items) {
-      if (item.productId?.startsWith('VBS-ACC-') || item.productId?.startsWith('ACC-')) {
+      if (/^ACC-[56]\d{3}$/.test(item.productId || '') && !db.getAccountById(item.productId)) {
+        const numId = parseInt(item.productId.slice(4), 10);
+        const idx = numId >= 6001 ? numId - 6000 : numId - 5000;
+        if (isNaN(idx) || idx < 1 || idx > 108) {
+          return res.status(400).json({ error: `Account listing ${item.productId} not found` });
+        }
+        let tier: 'BUDGET' | 'MEDIUM' | 'HIGH' = 'BUDGET';
+        let price = 10 + (idx % 15);
+        if (idx % 3 === 2) {
+          tier = 'MEDIUM';
+          price = 35 + (idx % 40);
+        } else if (idx % 3 === 0) {
+          tier = 'HIGH';
+          price = 85 + (idx % 150);
+        }
+        const title = tier === 'HIGH'
+          ? `OG Stacked Locker #${idx}`
+          : tier === 'MEDIUM'
+          ? `Mid-Tier Rare Account #${idx}`
+          : `Starter Budget Acc #${idx}`;
+        const qty = 1;
+        calculatedTotal += price * qty;
+        verifiedItems.push({
+          productId: item.productId,
+          name: title,
+          category: 'account',
+          cosmeticType: 'Bundle',
+          rarity: tier === 'HIGH' ? 'Legendary' : tier === 'MEDIUM' ? 'Epic' : 'Rare',
+          price,
+          quantity: qty,
+          image: typeof item.image === 'string' && item.image.startsWith('http')
+            ? item.image
+            : '/src/assets/images/gaming_account_showcase_1793465508903.jpg',
+          deliveryMethod: 'Instant Delivery • Full Email Access'
+        });
+      } else if (item.productId?.startsWith('VBS-ACC-') || item.productId?.startsWith('ACC-')) {
         const acc = db.getAccountById(item.productId);
         if (!acc) {
           return res.status(400).json({ error: `Account listing ${item.productId} not found` });
@@ -183,6 +272,82 @@ app.post('/api/orders', (req: Request, res: Response) => {
           quantity: qty,
           image: acc.screenshots[0] || '/src/assets/images/gaming_account_showcase_1793465508903.jpg',
           deliveryMethod: 'Full email access transfer with security checklist.'
+        });
+      } else if (/^FN-\d+$/.test(item.productId || '')) {
+        const numId = parseInt(item.productId.slice(3), 10);
+        const isV2Range = numId >= 2001 && numId <= 2108;
+        const idx = isV2Range ? numId - 2000 : numId - 1000;
+        if (isNaN(idx) || idx < 1 || idx > 108) {
+          return res.status(400).json({ error: `Account listing ${item.productId} not found` });
+        }
+        const FN_ACCOUNT_TITLES = [
+          'OG Renegade + Black Knight Stacked Account',
+          'Travis Scott + Astro Jack Rare Tryhard Acc',
+          'IKONIK + Glow + Wonder Exclusive Locker',
+          'Blue Squire + Royale Knight OG Veteran',
+          'Peely + Midas + Chapter 2 Max Stacked',
+          'Aura + Crystal + Star Wand Sweat Locker',
+          'Full Access OG Skull + Ghoul Trooper',
+          'Rare Minty Axe + Galaxy Bundle Account'
+        ];
+        let price = isV2Range ? 10 + (idx % 15) : 9 + (idx % 16);
+        if (idx % 3 === 2) {
+          price = isV2Range ? 32 + (idx % 40) : 30 + (idx % 45);
+        } else if (idx % 3 === 0) {
+          price = isV2Range ? 85 + (idx % 160) : 85 + (idx % 165);
+        }
+        const title = `${FN_ACCOUNT_TITLES[idx % FN_ACCOUNT_TITLES.length]} #${idx}`;
+        const qty = 1;
+        calculatedTotal += price * qty;
+        verifiedItems.push({
+          productId: item.productId,
+          name: title,
+          category: 'account',
+          cosmeticType: 'Bundle',
+          rarity: idx % 3 === 0 ? 'Legendary' : idx % 3 === 2 ? 'Epic' : 'Rare',
+          price,
+          quantity: qty,
+          image: typeof item.image === 'string' && item.image.startsWith('http')
+            ? item.image
+            : '/src/assets/images/gaming_account_showcase_1793465508903.jpg',
+          deliveryMethod: 'Full Email Access • Instant Credentials Delivery • 100% Secure'
+        });
+      } else if (/^COS-(OUTFIT|PICKAXE|GLIDER|EMOTE|BACKPACK)-([A-Z0-9]+)-(.+)$/.test(item.productId || '')) {
+        const match = (item.productId as string).match(/^COS-(OUTFIT|PICKAXE|GLIDER|EMOTE|BACKPACK)-([A-Z0-9]+)-(.+)$/)!;
+        const cType = match[1].toLowerCase();
+        const cRarity = match[2].toLowerCase();
+        const cId = match[3];
+        const known = cosmeticsCatalogMap.get(cId);
+        const authoritativeType = known ? known.type : cType;
+        const authoritativeRarity = known ? known.rarity : cRarity;
+        const price = getCosmeticUsdPriceServer(authoritativeType, authoritativeRarity);
+        const qty = Math.max(1, parseInt(item.quantity || 1, 10));
+        calculatedTotal += price * qty;
+
+        const cosmeticTypeLabel =
+          authoritativeType === 'outfit'
+            ? 'Outfit'
+            : authoritativeType === 'pickaxe'
+            ? 'Pickaxe'
+            : authoritativeType === 'glider'
+            ? 'Glider'
+            : authoritativeType === 'emote'
+            ? 'Emote'
+            : 'Back Bling';
+
+        verifiedItems.push({
+          productId: item.productId,
+          name: known ? known.name : (typeof item.name === 'string' && item.name.trim() ? item.name.trim() : cId),
+          category: authoritativeType,
+          cosmeticType: cosmeticTypeLabel,
+          rarity: authoritativeRarity.charAt(0).toUpperCase() + authoritativeRarity.slice(1),
+          price,
+          quantity: qty,
+          image: known?.icon || (typeof item.image === 'string' && item.image.startsWith('https://fortnite-api.com/') ? item.image : '/src/assets/images/gaming_account_showcase_1793465508903.jpg'),
+          deliveryMethod: 'Direct Gifting Protocol / Epic Friend Delivery (48h Friend Rule Applies)',
+          isGift: Boolean(item.isGift),
+          giftRecipientEpicId: item.giftRecipientEpicId,
+          giftMessage: item.giftMessage
         });
       } else {
         const prod = db.getProductById(item.productId);

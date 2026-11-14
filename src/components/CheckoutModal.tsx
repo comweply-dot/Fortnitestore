@@ -59,7 +59,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         platform,
         items: items.map(item => ({
           productId: item.isAccount && item.account ? item.account.id : item.product.id,
-          quantity: item.quantity
+          quantity: item.quantity,
+          image: item.product.image
         })),
         selectedNetwork,
         customerNotes: customerNotes.trim() || undefined
